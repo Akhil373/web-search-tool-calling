@@ -3,8 +3,7 @@ A tool to let language models search the web using simple prompts.
 
 Web Search Results             |  Final Output
 :-------------------------:|:-------------------------:
- ![Screenshot 2025-06-05 161342 (Small) (1)](https://github.com/user-attachments/assets/47c56e00-73b3-43a7-b277-28963511979a)  |  ![Screenshot 2025-06-05 161350 (Small)](https://github.com/user-attachments/assets/862172a0-8be4-4a89-8c25-fe2036276375)
-
+![](https://github.com/user-attachments/assets/5dd85760-03ed-468e-ae05-53d4355f08bb)  |  ![](https://github.com/user-attachments/assets/9a87bd2f-17e6-4479-b2b0-2b0936b65117)
 
 
 ## Setup
