@@ -141,7 +141,7 @@ function App() {
 
     return (
         <>
-            <div className="flex flex-col items-center justify-center w-screen h-screen p-5 py-10 md:p-10" data-theme="forest">
+            <div className="flex flex-col items-center justify-center w-screen h-screen p-5 py-20 md:p-10" data-theme="forest">
             <TopBar clearChat={handleClearChat}/>
                 <ChatInterfance msgs={messages} clear={clearing} />
 
