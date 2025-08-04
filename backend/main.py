@@ -194,7 +194,8 @@ router = APIRouter()
 
 origins = [
     "http://localhost:5173",
-    "http://localhost"
+    "http://localhost",
+    "https://web-query.vercel.app/",
 ]
 
 app.add_middleware(
