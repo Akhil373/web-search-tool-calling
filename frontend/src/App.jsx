@@ -1,18 +1,23 @@
-import React, { useEffect, useRef, useState } from "react"
-import ChatInterfance from "../components/ChatInterface"
-import TopBar from "../components/TopBar"
+import React, { useEffect, useRef, useState } from "react";
+import ChatInterfance from "../components/ChatInterface";
+import TopBar from "../components/TopBar";
 
 function App() {
     const [text, setText] = useState("")
     const textareaRef = useRef(null)
 
+    const [conversationId, setConversationId] = useState(null)
+
     const [messages, setMessages] = useState([])
     const [clearing, setClearning] = useState(false)
 
-    const fetchData = async (userPrompt, messageId) => {
-        const url = 'http://127.0.0.1:8000/generate';
-        const dataToSend = { prompt: userPrompt };
-
+    const fetchData = async (userPrompt, messageId, conversationId = null) => {
+        const url = `http://127.0.0.1:8000/generate`;
+        const dataToSend = {
+            prompt: userPrompt,
+            conversation_id: conversationId
+        };
+        
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -21,15 +26,21 @@ function App() {
                 },
                 body: JSON.stringify(dataToSend),
             });
-
+            
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(`HTTP error! Status: ${response.status} - ${errorData.error || response.statusText}`);
             }
-
-            const reader = response.body.getReader()
-            const decoder = new TextDecoder()
+            
+            const newConversationId = response.headers.get('X-Conversation-ID');
+            if (newConversationId && newConversationId !== conversationId) {
+                setConversationId(newConversationId);
+            }
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
             let full = '';
+            
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -38,11 +49,14 @@ function App() {
                     m.id === messageId ? { ...m, text: full } : m
                 ));
             }
+            
+            return newConversationId;
         } catch (err) {
             console.error("Error fetching data:", err);
             setMessages(prevMessages => prevMessages.map(msg =>
                 msg.id === messageId ? {...msg, text: "Sorry, I ran into an error."} : msg
-            ))
+            ));
+            return conversationId;
         }
     };
 
@@ -78,29 +92,50 @@ function App() {
                     id: Date.now(),
                     text: userMsgText,
                     sender: "You"
-                }
-
-                const aiMsgId = Date.now() + 1
+                };
+                const aiMsgId = Date.now() + 1;
                 const newAiMsg = {
                     id: aiMsgId,
                     text: "Thinking...",
                     sender: "AI"
+                };
+                
+                setMessages(prev => [...prev, newUserMsg, newAiMsg]);
+                setText('');
+                
+                const currentConversationId = conversationId;
+                const returnedConversationId = await fetchData(userMsgText, aiMsgId, currentConversationId);
+                
+                if (returnedConversationId && returnedConversationId !== currentConversationId) {
+                    setConversationId(returnedConversationId);
                 }
-
-                setMessages((prevMessages => [...prevMessages, newUserMsg, newAiMsg]))
-                setText('')
-
-                fetchData(userMsgText, aiMsgId)
             }
         }
     };
+    const handleClearChat = async () => {
+        if(conversationId) {
+            setClearning(true)
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/conversations/${conversationId}`, {
+                    method: 'DELETE'
+                })
+                
+                if (response.ok) {
+                    setConversationId(null)
+                    setTimeout(() => {
+                        setMessages([])
+                        setClearning(false)
+                    }, 200)
+                } else {
+                    console.error('Failed to clear chat:', response.status)
+                    setClearning(false)
+                }
+            }
+            catch(e) {
+                console.error(`Error clearing chat: ${e}`)
+            }
 
-    const handleClearChat = () => {
-        setClearning(true)
-        setTimeout(() => {
-            setMessages([])
-            setClearning(false)
-        }, 300)
+        }
     }
 
     return (

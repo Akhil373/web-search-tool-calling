@@ -1,3 +1,4 @@
+from typing import List, Dict
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chat_models import init_chat_model
@@ -11,23 +12,23 @@ from fastapi import FastAPI, APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 import logging
-
+from uuid import uuid4
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-
 google_api_key = os.getenv("GOOGLE_SEARCH_API")
 cse_id = os.getenv("CSE_ID")
-mistral_api_key = os.getenv("MISTRAL_API_KEY")
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 
 llm = init_chat_model(
-    model="mistral-small-2506",
-    model_provider="mistralai",
-    api_key=mistral_api_key
+    model="gemini-2.5-flash",
+    model_provider="google-genai",
+    api_key=gemini_api_key
 )
 
 def web_search(search_item: str, search_depth: int = 10, site_filter: str | None = None):
@@ -127,7 +128,7 @@ async def retrieve_webpage_content(search_item: str) -> str:
 #         return None
 
 system_prompt="""
-You are a helpful, meticulous, and adaptable research assistant. Your primary goal is to answer user questions accurately by synthesizing information from web search results.
+You are a helpful, meticulous, and adaptable research assistant. Your primary goal is to answer user questions accurately by synthesizing information from web search results. If the query does NOT require web search, just use your internet knowledge.
 
 CRITICAL RULES:
 
@@ -163,12 +164,15 @@ Sources
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
+    MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{input}"),
-    MessagesPlaceholder("agent_scratchpad")
+    MessagesPlaceholder(variable_name="agent_scratchpad"),
 ])
 
 tools = [retrieve_webpage_content]
 
+
+conversation_history: Dict[str, List[BaseMessage]] = {}
 
 agent = create_tool_calling_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(
@@ -182,6 +186,7 @@ agent_executor = AgentExecutor(
 
 class PromptRequest(BaseModel):
     prompt: str
+    conversation_id: str | None = None
 
 
 app = FastAPI()
@@ -197,34 +202,74 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=['*'],
-    allow_headers=['*']
+    allow_headers=['*'],
+    expose_headers=['*']
 )
 
-async def stream_tokens(user_input: str):
-    async for event in agent_executor.astream_events(
-        {"input": user_input},
-        version="v1"
-    ):
+def get_conversation_history(conversation_id: str) -> List[BaseMessage]:
+    """Get existing conversation history or create new one"""
+    if conversation_id not in conversation_history:
+        conversation_history[conversation_id] = []
+    return conversation_history[conversation_id]
+
+async def stream_tokens(user_input: str, conversation_id: str):
+    chat_history = get_conversation_history(conversation_id)
+    
+    agent_input = {
+        "input": user_input,
+        "chat_history": chat_history
+    }
+    
+    full_response = ""
+    
+    async for event in agent_executor.astream_events(agent_input, version="v1"):
         if event["event"] == "on_chat_model_stream":
             chunk = event["data"]["chunk"]
             if hasattr(chunk, 'content') and chunk.content:
+                full_response += chunk.content
                 yield chunk.content
-
-
+    
+    chat_history.append(HumanMessage(content=user_input))
+    chat_history.append(AIMessage(content=full_response))
+    
+    if len(chat_history) > 20:
+        chat_history.clear()
+        conversation_history[conversation_id] = chat_history
+        
 @router.post("/generate/")
 async def generate_final_answer(request_data: PromptRequest):
     """
     POST /generate
-    Body: {"prompt": "your question"}
-    Returns: {}
+    Body: {"prompt": "your question", "conversation_id": "uuid"}
+    Returns: StreamingResponse with X-Conversation-ID header
     """
+    conversation_id = request_data.conversation_id or str(uuid4())
+
     return StreamingResponse(
-        stream_tokens(request_data.prompt),
-        media_type="text/plain"
+        stream_tokens(request_data.prompt, conversation_id),
+        media_type="text/plain",
+        headers={"X-Conversation-ID": conversation_id}
     )
 
-app.include_router(router)
+@router.delete("/conversations/{conversation_id}")
+async def clear_chat(conversation_id: str):
+    """Clear a specific conversation history"""
+    try:
+        if conversation_id in conversation_history:
+            del conversation_history[conversation_id]
+            return{"message": "Conversation deleted."}
+        return {"message": "Unable to find conversation."}
+    except Exception as e:
+        return {"error": e}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+@router.get("/conversations/{conversation_id}")
+async def get_chat_history(conversation_id: str):
+    """Get a specific conversation history"""
+    history = conversation_history[conversation_id]
+    return {
+        "conversation_id": conversation_id,
+        "messages": [{"type": type(msg).__name__, "content": msg.content} for msg in history]
+    }
+
+app.include_router(router)
