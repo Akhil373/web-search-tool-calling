@@ -3,6 +3,7 @@ import ChatInterfance from "../components/ChatInterface";
 import TopBar from "../components/TopBar";
 
 function App() {
+    const backendURL = "http://127.0.0.1:8000"
     const [text, setText] = useState("")
     const textareaRef = useRef(null)
 
@@ -12,7 +13,7 @@ function App() {
     const [clearing, setClearning] = useState(false)
 
     const fetchData = async (userPrompt, messageId, conversationId = null) => {
-        const url = `http://127.0.0.1:8000/generate`;
+        const url = `${backendURL}/generate`;
         const dataToSend = {
             prompt: userPrompt,
             conversation_id: conversationId
@@ -116,7 +117,7 @@ function App() {
         if(conversationId) {
             setClearning(true)
             try {
-                const response = await fetch(`http://127.0.0.1:8000/conversations/${conversationId}`, {
+                const response = await fetch(`${backendURL}/conversations/${conversationId}`, {
                     method: 'DELETE'
                 })
                 
