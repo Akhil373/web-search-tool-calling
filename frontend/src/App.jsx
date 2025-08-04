@@ -3,7 +3,7 @@ import ChatInterfance from "../components/ChatInterface";
 import TopBar from "../components/TopBar";
 
 function App() {
-    const backendURL = "http://127.0.0.1:8000"
+    const backendURL = "https://web-search-tool-calling.onrender.com"
     const [text, setText] = useState("")
     const textareaRef = useRef(null)
 
