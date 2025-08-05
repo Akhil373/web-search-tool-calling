@@ -141,7 +141,7 @@ function App() {
 
     return (
         <>
-            <div className="flex flex-col items-center justify-center w-screen h-screen p-5 py-20 md:p-10" data-theme="forest">
+            <div className="flex flex-col items-center justify-center w-screen h-screen p-5 py-16 md:p-10" data-theme="forest">
             <TopBar clearChat={handleClearChat}/>
                 <ChatInterfance msgs={messages} clear={clearing} />
 
@@ -151,13 +151,14 @@ function App() {
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
                     placeholder="Chat with Internet"
-                    className={`text textarea textarea-md md:textarea-lg bg-white/5 backdrop-blur-xl shadow-2xl transition-all w-[50%] md:w-[30%] focus:md:w-[75%] focus:lg:w-[60%] focus:w-full mt-1.5 ease-in-out duration-600 resize-none rounded-2xl focus:outline-none focus:border-gray-700 border border-white/30
-                    ${messages.length>0 ? "md:w-[75%] lg:w-[60%] w-full" : null}
+                    className={`text textarea textarea-md md:textarea-lg bg-white/5 backdrop-blur-xl shadow-2xl transition-all w-[50%] md:w-[30%] focus:md:w-[75%] focus:lg:w-[60%] focus:w-full ease-in-out duration-600 resize-none rounded-2xl focus:outline-none focus:border-gray-700 border border-white/30
+                    ${messages.length>0 ? "md:w-[75%] lg:w-[60%] w-full mt-4" : null}
                         `}
                     style={{
                         minHeight: "3rem",
                         height: "3rem",
                         overflowY: "hidden",
+                        marginBottom: messages.length > 0 ? "2rem" : "0.5rem"
                     }}
                 ></textarea>
             </div>
