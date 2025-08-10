@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
-import ChatInterfance from "../components/ChatInterface";
-import TopBar from "../components/TopBar";
+import React, { useEffect, useRef, useState } from "react"
+import ChatInterfance from "../components/ChatInterface"
+import TopBar from "../components/TopBar"
 
 function App() {
     const backendURL = "https://web-search-tool-calling.onrender.com"
     const [text, setText] = useState("")
     const textareaRef = useRef(null)
+    const [loading, setLoading] = useState(false)
 
     const [conversationId, setConversationId] = useState(null)
 
@@ -13,53 +14,65 @@ function App() {
     const [clearing, setClearning] = useState(false)
 
     const fetchData = async (userPrompt, messageId, conversationId = null) => {
-        const url = `${backendURL}/generate`;
+        const url = `${backendURL}/generate`
         const dataToSend = {
             prompt: userPrompt,
-            conversation_id: conversationId
-        };
-        
+            conversation_id: conversationId,
+        }
+        setLoading(true)
         try {
             const response = await fetch(url, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify(dataToSend),
-            });
-            
+            })
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`HTTP error! Status: ${response.status} - ${errorData.error || response.statusText}`);
+                const errorData = await response.json()
+                throw new Error(
+                    `HTTP error! Status: ${response.status} - ${
+                        errorData.error || response.statusText
+                    }`
+                )
             }
-            
-            const newConversationId = response.headers.get('X-Conversation-ID');
+
+            const newConversationId = response.headers.get("X-Conversation-ID")
             if (newConversationId && newConversationId !== conversationId) {
-                setConversationId(newConversationId);
+                setConversationId(newConversationId)
             }
-            
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let full = '';
-            
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let full = ""
+
             while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                full += decoder.decode(value, { stream: true });
-                setMessages(prev => prev.map(m =>
-                    m.id === messageId ? { ...m, text: full } : m
-                ));
+                const {done, value} = await reader.read()
+                if (done) break
+                full += decoder.decode(value, {stream: true})
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.id === messageId ? {...m, text: full} : m
+                    )
+                )
             }
-            
-            return newConversationId;
+
+            return newConversationId
         } catch (err) {
-            console.error("Error fetching data:", err);
-            setMessages(prevMessages => prevMessages.map(msg =>
-                msg.id === messageId ? {...msg, text: "Sorry, I ran into an error."} : msg
-            ));
-            return conversationId;
+            console.error("Error fetching data:", err)
+            setMessages((prevMessages) =>
+                prevMessages.map((msg) =>
+                    msg.id === messageId
+                        ? {...msg, text: "Sorry, I ran into an error."}
+                        : msg
+                )
+            )
+            return conversationId
+        } finally {
+            setLoading(false)
         }
-    };
+    }
 
     const adjustHeight = () => {
         const textarea = textareaRef.current
@@ -86,41 +99,52 @@ function App() {
 
     const handleKeyDown = async (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            const userMsgText = text.trim();
+            e.preventDefault()
+            const userMsgText = text.trim()
             if (userMsgText) {
                 const newUserMsg = {
                     id: Date.now(),
                     text: userMsgText,
-                    sender: "You"
-                };
-                const aiMsgId = Date.now() + 1;
+                    sender: "You",
+                }
+                const aiMsgId = Date.now() + 1
                 const newAiMsg = {
                     id: aiMsgId,
                     text: "Thinking...",
-                    sender: "AI"
-                };
-                
-                setMessages(prev => [...prev, newUserMsg, newAiMsg]);
-                setText('');
-                
-                const currentConversationId = conversationId;
-                const returnedConversationId = await fetchData(userMsgText, aiMsgId, currentConversationId);
-                
-                if (returnedConversationId && returnedConversationId !== currentConversationId) {
-                    setConversationId(returnedConversationId);
+                    sender: "AI",
+                }
+
+                setMessages((prev) => [...prev, newUserMsg, newAiMsg])
+                setText("")
+
+                const currentConversationId = conversationId
+                const returnedConversationId = await fetchData(
+                    userMsgText,
+                    aiMsgId,
+                    currentConversationId
+                )
+
+                if (
+                    returnedConversationId &&
+                    returnedConversationId !== currentConversationId
+                ) {
+                    setConversationId(returnedConversationId)
                 }
             }
         }
-    };
+    }
+
     const handleClearChat = async () => {
-        if(conversationId) {
+        if (conversationId) {
             setClearning(true)
             try {
-                const response = await fetch(`${backendURL}/conversations/${conversationId}`, {
-                    method: 'DELETE'
-                })
-                
+                const response = await fetch(
+                    `${backendURL}/conversations/${conversationId}`,
+                    {
+                        method: "DELETE",
+                    }
+                )
+
                 if (response.ok) {
                     setConversationId(null)
                     setTimeout(() => {
@@ -128,21 +152,22 @@ function App() {
                         setClearning(false)
                     }, 200)
                 } else {
-                    console.error('Failed to clear chat:', response.status)
+                    console.error("Failed to clear chat:", response.status)
                     setClearning(false)
                 }
-            }
-            catch(e) {
+            } catch (e) {
                 console.error(`Error clearing chat: ${e}`)
             }
-
         }
     }
 
     return (
         <>
-            <div className="flex flex-col items-center justify-center w-screen h-screen p-5 py-16 md:p-10" data-theme="forest">
-            <TopBar clearChat={handleClearChat}/>
+            <div
+                className="flex flex-col items-center justify-center w-screen h-screen p-5 py-16 md:p-10"
+                data-theme="forest"
+            >
+                <TopBar clearChat={handleClearChat} />
                 <ChatInterfance msgs={messages} clear={clearing} />
 
                 <textarea
@@ -150,15 +175,20 @@ function App() {
                     value={text}
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
+                    disabled={loading}
                     placeholder="Chat with Internet"
                     className={`text textarea textarea-md md:textarea-lg bg-white/5 backdrop-blur-xl shadow-2xl transition-all w-[50%] md:w-[30%] focus:md:w-[75%] focus:lg:w-[60%] focus:w-full ease-in-out duration-600 resize-none rounded-2xl focus:outline-none focus:border-gray-700 border border-white/30
-                    ${messages.length>0 ? "md:w-[75%] lg:w-[60%] w-full mt-4" : null}
+                    ${
+                        messages.length > 0
+                            ? "md:w-[75%] lg:w-[60%] w-full mt-4"
+                            : null
+                    }
                         `}
                     style={{
                         minHeight: "3rem",
                         height: "3rem",
                         overflowY: "hidden",
-                        marginBottom: messages.length > 0 ? "2rem" : "0.5rem"
+                        marginBottom: messages.length > 0 ? "2rem" : "0.5rem",
                     }}
                 ></textarea>
             </div>
